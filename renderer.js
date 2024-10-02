@@ -18,7 +18,7 @@ let remoteDuration = null;
 
 // Initialize WebSocket connection
 function initWebSocket() {
-  ws = new WebSocket('ws://localhost:8080');
+  ws = new WebSocket('ws://192.168.238.56:8080');
 
   ws.onopen = () => {
     console.log('Connected to WebSocket server');
