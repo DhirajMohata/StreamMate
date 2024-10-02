@@ -16,9 +16,16 @@ let isFileVerified = false;
 let localDuration = null;
 let remoteDuration = null;
 
+// Flag to prevent sync loop
+let isSyncing = false;
+
+// Debounce timer for seek events
+let seekDebounceTimer = null;
+const SEEK_DEBOUNCE_DELAY = 300; // milliseconds
+
 // Initialize WebSocket connection
 function initWebSocket() {
-  ws = new WebSocket('ws://192.168.238.56:8080');
+  ws = new WebSocket('ws://192.168.86.56:8080'); // Replace with your server's IP
 
   ws.onopen = () => {
     console.log('Connected to WebSocket server');
@@ -97,7 +104,7 @@ fileInput.addEventListener('change', (event) => {
     videoPlayer.src = videoURL;
     videoPlayer.style.display = 'block';
     fileError.textContent = '';
-    
+
     // Get video duration
     videoPlayer.onloadedmetadata = () => {
       localDuration = videoPlayer.duration;
@@ -127,6 +134,8 @@ function verifyFiles() {
 function handleSyncAction(data) {
   if (!isFileVerified) return;
 
+  isSyncing = true; // Set flag before performing the action
+
   switch (data.action) {
     case 'play':
       videoPlayer.currentTime = data.currentTime;
@@ -142,23 +151,32 @@ function handleSyncAction(data) {
     default:
       break;
   }
+
+  // Use a timeout to ensure all related events are handled
+  setTimeout(() => {
+    isSyncing = false; // Reset flag after action
+  }, 100); // 100ms delay
 }
 
-// Synchronize play, pause, and seek actions
+// Synchronize play, pause, and seek actions with checks
 videoPlayer.addEventListener('play', () => {
-  if (isFileVerified) {
+  if (isFileVerified && !isSyncing) { // Check if not syncing
     ws.send(JSON.stringify({ type: 'sync_action', action: 'play', currentTime: videoPlayer.currentTime }));
   }
 });
 
 videoPlayer.addEventListener('pause', () => {
-  if (isFileVerified) {
+  if (isFileVerified && !isSyncing) { // Check if not syncing
     ws.send(JSON.stringify({ type: 'sync_action', action: 'pause', currentTime: videoPlayer.currentTime }));
   }
 });
 
 videoPlayer.addEventListener('seeked', () => {
-  if (isFileVerified) {
-    ws.send(JSON.stringify({ type: 'sync_action', action: 'seek', currentTime: videoPlayer.currentTime }));
+  if (isFileVerified && !isSyncing) { // Check if not syncing
+    // Implement debouncing to prevent rapid-fire seek events
+    clearTimeout(seekDebounceTimer);
+    seekDebounceTimer = setTimeout(() => {
+      ws.send(JSON.stringify({ type: 'sync_action', action: 'seek', currentTime: videoPlayer.currentTime }));
+    }, SEEK_DEBOUNCE_DELAY);
   }
 });

@@ -3,19 +3,21 @@ const WebSocket = require('ws');
 const server = new WebSocket.Server({ port: 8080, host: '0.0.0.0' });
 
 const rooms = {};
-
+console.log("HEREE", server)
 server.on('connection', (socket) => {
   socket.roomId = null;
-
+  console.log("HEREE")
   socket.on('message', (message) => {
     const data = JSON.parse(message);
 
     switch (data.type) {
       case 'create_room':
         // Generate a unique room ID
+        console.log("HEREE")
         const roomId = `room_${Math.random().toString(36).substr(2, 9)}`;
         rooms[roomId] = [socket];
         socket.roomId = roomId;
+        console.log("HEREE")
         socket.send(JSON.stringify({ type: 'room_created', roomId }));
         break;
 
