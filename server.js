@@ -48,27 +48,6 @@ server.on('connection', (socket) => {
         }, socket);
         break;
 
-      case 'offer':
-        broadcastToRoom(socket.roomId, {
-          type: 'offer',
-          offer: data.offer
-        }, socket);
-        break;
-
-      case 'answer':
-        broadcastToRoom(socket.roomId, {
-          type: 'answer',
-          answer: data.answer
-        }, socket);
-        break;
-
-      case 'ice_candidate':
-        broadcastToRoom(socket.roomId, {
-          type: 'ice_candidate',
-          candidate: data.candidate
-        }, socket);
-        break;
-
       default:
         console.log('Unknown message type:', data.type);
         socket.send(JSON.stringify({ type: 'error', message: 'Unknown message type.' }));

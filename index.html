@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Video Sync Player</title>
+  <title>Video Sync App</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <script>
     tailwind.config = {
@@ -17,14 +17,6 @@
     body {
       transition: background-color 0.3s, color 0.3s;
     }
-    /* Draggable Popup Styles */
-    .draggable {
-      position: absolute;
-      top: 20px;
-      left: 20px;
-      z-index: 1000;
-      cursor: move;
-    }
   </style>
 </head>
 <body class="bg-gray-900 text-white font-sans min-h-screen flex flex-col items-center justify-center transition-colors duration-300" id="app-body">
@@ -37,104 +29,29 @@
     </svg>
   </button>
 
-  <!-- Container for the app with chat sidebar -->
-  <div class="w-full max-w-5xl mx-auto px-4 py-8 space-y-6 bg-gray-800 dark:bg-gray-100 text-gray-100 dark:text-gray-800 rounded-lg shadow-lg flex flex-col md:flex-row">
+  <!-- Landing Container -->
+  <div class="w-full max-w-md px-6 py-8 bg-gray-800 dark:bg-gray-100 text-gray-100 dark:text-gray-800 rounded-lg shadow-lg">
+    <h1 class="text-2xl font-bold text-center mb-6 text-blue-400 dark:text-blue-600">Welcome to Video Sync App</h1>
     
-    <!-- Main Content (70%) -->
-    <div class="w-full md:w-7/10 space-y-6">
-      <h1 class="text-3xl font-bold text-center mb-6 text-blue-400 dark:text-blue-600">Video Sync Player</h1>
-      
-      <!-- Controls: Create or Join Room -->
-      <div id="controls" class="flex flex-col sm:flex-row justify-center items-center space-y-4 sm:space-y-0 sm:space-x-4 mb-6">
-        <button id="create-room" class="bg-blue-500 hover:bg-blue-600 text-white dark:bg-blue-400 dark:hover:bg-blue-500 dark:text-gray-900 px-6 py-3 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-300">
-          Create Room
-        </button>
-        <div class="flex items-center space-x-2">
-          <input type="text" id="room-id-input" placeholder="Enter Room ID"
-            class="bg-gray-700 dark:bg-gray-200 border border-gray-600 dark:border-gray-400 text-white dark:text-gray-800 rounded-md px-4 py-3 focus:outline-none focus:border-blue-400 focus:ring-1 focus:ring-blue-400">
-          <button id="join-room" class="bg-green-500 hover:bg-green-600 text-white dark:bg-green-400 dark:hover:bg-green-500 dark:text-gray-900 px-6 py-3 rounded-md focus:outline-none focus:ring-2 focus:ring-green-300">
-            Join Room
-          </button>
-        </div>
-      </div>
-
-      <!-- Room Info -->
-      <p id="room-info" class="text-center text-lg text-green-400 dark:text-green-600"></p>
-      <p id="error" class="text-center text-red-500 dark:text-red-600"></p>
-
-      <!-- File Selection -->
-      <div id="file-selection" class="flex flex-col items-center space-y-4" style="display: none;">
-        <input type="file" id="file-input" accept="video/*"
-          class="block w-full text-sm text-gray-300 dark:text-gray-800 file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-semibold file:bg-blue-700 file:text-white hover:file:bg-blue-800 dark:file:bg-blue-400 dark:file:text-gray-900 dark:hover:file:bg-blue-500">
-        <p id="file-error" class="text-red-500 dark:text-red-600"></p>
-      </div>
-
-      <!-- Video Player -->
-      <div class="w-full flex justify-center mt-8" style="display: none;" id="video-player">
-        <video id="video-player-main" controls class="w-full max-w-4xl bg-black dark:bg-gray-200 rounded-md shadow-lg"></video>
-      </div>
+    <!-- Create Room Button -->
+    <button id="create-room" class="w-full bg-blue-500 hover:bg-blue-600 text-white dark:bg-blue-400 dark:hover:bg-blue-500 dark:text-gray-900 px-4 py-3 rounded-md mb-4 focus:outline-none focus:ring-2 focus:ring-blue-300">
+      Create Room
+    </button>
+    
+    <!-- Join Room Form -->
+    <div class="flex flex-col">
+      <input type="text" id="room-id-input" placeholder="Enter Room ID"
+        class="bg-gray-700 dark:bg-gray-200 border border-gray-600 dark:border-gray-400 text-white dark:text-gray-800 rounded-md px-4 py-3 mb-4 focus:outline-none focus:border-blue-400 focus:ring-1 focus:ring-blue-400">
+      <button id="join-room" class="w-full bg-green-500 hover:bg-green-600 text-white dark:bg-green-400 dark:hover:bg-green-500 dark:text-gray-900 px-4 py-3 rounded-md focus:outline-none focus:ring-2 focus:ring-green-300">
+        Join Room
+      </button>
     </div>
     
-    <!-- Chat Sidebar (30%) -->
-    <div class="w-full md:w-3/10 mt-8 md:mt-0 md:ml-6 bg-gray-700 dark:bg-gray-300 p-4 rounded-md shadow-inner flex flex-col">
-      
-      <!-- Chat Header with Voice and Video Call Buttons -->
-      <div class="flex justify-between items-center mb-4">
-        <h2 class="text-xl font-semibold text-blue-400 dark:text-blue-600">Chat</h2>
-        <div class="flex space-x-2">
-          <button id="voice-call-btn" class="bg-green-500 hover:bg-green-600 text-white dark:bg-green-400 dark:hover:bg-green-500 dark:text-gray-900 p-2 rounded-full focus:outline-none focus:ring-2 focus:ring-green-300">
-            <!-- Phone Icon -->
-            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 5a2 2 0 012-2h3.28a2 2 0 011.984 1.75l.28 2a2 2 0 01-.342 1.031l-1.66 2.65a11.042 11.042 0 006.807 6.807l2.65-1.66a2 2 0 011.031-.342l2 .28A2 2 0 0121 9.28V13a2 2 0 01-2 2h-2.22a2 2 0 01-1.983-1.75l-.28-2a2 2 0 01.342-1.031l1.66-2.65a11.042 11.042 0 00-6.807-6.807l-2.65 1.66a2 2 0 01-1.031 .342l-2 -.28A2 2 0 013 9.28V5z" />
-            </svg>
-          </button>
-          <button id="video-call-btn" class="bg-red-500 hover:bg-red-600 text-white dark:bg-red-400 dark:hover:bg-red-500 dark:text-gray-900 p-2 rounded-full focus:outline-none focus:ring-2 focus:ring-red-300">
-            <!-- Video Camera Icon -->
-            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14m-6 0V8m0 0L4.447 5.724A1 1 0 013 6.618v6.764a1 1 0 01.447.894L9 14z" />
-            </svg>
-          </button>
-        </div>
-      </div>
-      
-      <!-- Chat Messages -->
-      <div id="chat-messages" class="flex-grow h-64 overflow-y-auto mb-4 bg-gray-600 dark:bg-gray-200 p-2 rounded">
-        <!-- Chat messages will appear here -->
-      </div>
-      
-      <!-- Chat Input -->
-      <div class="flex">
-        <input type="text" id="chat-input" placeholder="Type your message..."
-          class="flex-grow bg-gray-500 dark:bg-gray-100 border border-gray-600 dark:border-gray-400 text-white dark:text-gray-800 rounded-md px-4 py-2 focus:outline-none focus:border-blue-400 focus:ring-1 focus:ring-blue-400">
-        <button id="send-chat" class="ml-2 bg-green-500 hover:bg-green-600 text-white dark:bg-green-400 dark:hover:bg-green-500 dark:text-gray-900 px-4 py-2 rounded-md focus:outline-none focus:ring-2 focus:ring-green-300">
-          Send
-        </button>
-      </div>
-      
-      <!-- Video Call Container (Draggable Popup) -->
-      <div id="video-call-popup" class="draggable hidden bg-gray-800 dark:bg-gray-200 p-4 rounded-md shadow-lg">
-        <div class="flex justify-between items-center mb-2">
-          <h3 class="text-lg font-semibold text-blue-400 dark:text-blue-600">Video Call</h3>
-          <button id="close-call" class="text-red-500 hover:text-red-600 focus:outline-none">
-            <!-- Close Icon -->
-            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
-            </svg>
-          </button>
-        </div>
-        <div class="flex space-x-4">
-          <video id="local-video" autoplay muted class="w-32 h-24 bg-black rounded-md shadow-lg"></video>
-          <video id="remote-video" autoplay class="w-32 h-24 bg-black rounded-md shadow-lg"></video>
-        </div>
-      </div>
-    </div>
-
-    <!-- Chat Sidebar Draggable Popup (if needed) -->
-    
+    <!-- Error Message -->
+    <p id="error" class="text-center text-red-500 dark:text-red-600 mt-4"></p>
   </div>
 
   <script src="renderer.js"></script>
   <script src="theme-toggle.js"></script>
 </body>
 </html>
-  
