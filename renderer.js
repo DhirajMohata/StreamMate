@@ -1,6 +1,7 @@
 // renderer.js
 const { ipcRenderer } = require('electron');
-const videoPlayer = document.getElementById('video-player');
+const videoPlayer = document.getElementById('video-player-main');
+const videoPlayerMain = document.getElementById('video-player');
 const fileInput = document.getElementById('file-input');
 const createRoomBtn = document.getElementById('create-room');
 const joinRoomBtn = document.getElementById('join-room');
@@ -25,7 +26,7 @@ const SEEK_DEBOUNCE_DELAY = 300; // milliseconds
 
 // Initialize WebSocket connection
 function initWebSocket() {
-  ws = new WebSocket('ws://192.168.86.56:8080'); // Replace with your server's IP
+  ws = new WebSocket('ws://192.168.107.56:8080'); // Replace with your server's IP
 
   ws.onopen = () => {
     console.log('Connected to WebSocket server');
@@ -63,7 +64,7 @@ function initWebSocket() {
 
       case 'peer_left':
         errorMsg.textContent = 'Peer has left the room.';
-        videoPlayer.style.display = 'none';
+        videoPlayerMain.style.display = 'none';
         fileSelection.style.display = 'none';
         break;
 
@@ -102,7 +103,7 @@ fileInput.addEventListener('change', (event) => {
   if (file) {
     const videoURL = URL.createObjectURL(file);
     videoPlayer.src = videoURL;
-    videoPlayer.style.display = 'block';
+    videoPlayerMain.style.display = 'block';
     fileError.textContent = '';
 
     // Get video duration
