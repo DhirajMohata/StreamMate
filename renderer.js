@@ -1,7 +1,10 @@
 // renderer.js
 const { ipcRenderer } = require('electron');
-const videoPlayer = document.getElementById('video-player-main');
-const videoPlayerMain = document.getElementById('video-player');
+
+// Correctly reference the container div and video element
+const videoPlayerContainer = document.getElementById('video-player'); // Container div
+const videoPlayer = document.getElementById('video-player-main'); // Video element
+
 const fileInput = document.getElementById('file-input');
 const createRoomBtn = document.getElementById('create-room');
 const joinRoomBtn = document.getElementById('join-room');
@@ -46,7 +49,7 @@ function initWebSocket() {
 
       case 'both_joined':
         isPeerReady = true;
-        fileSelection.style.display = 'block';
+        fileSelection.style.display = 'flex'; // Use flex for better alignment
         break;
 
       case 'file_info':
@@ -64,7 +67,7 @@ function initWebSocket() {
 
       case 'peer_left':
         errorMsg.textContent = 'Peer has left the room.';
-        videoPlayerMain.style.display = 'none';
+        videoPlayerContainer.style.display = 'none';
         fileSelection.style.display = 'none';
         break;
 
@@ -103,7 +106,7 @@ fileInput.addEventListener('change', (event) => {
   if (file) {
     const videoURL = URL.createObjectURL(file);
     videoPlayer.src = videoURL;
-    videoPlayerMain.style.display = 'block';
+    videoPlayerContainer.style.display = 'flex'; // Show the video player container
     fileError.textContent = '';
 
     // Get video duration
@@ -126,7 +129,7 @@ function verifyFiles() {
     } else {
       isFileVerified = false;
       fileError.textContent = 'Selected files do not have the same duration.';
-      videoPlayer.style.display = 'none';
+      videoPlayerContainer.style.display = 'none'; // Hide the container if verification fails
     }
   }
 }
@@ -134,6 +137,8 @@ function verifyFiles() {
 // Handle synchronization actions from the peer
 function handleSyncAction(data) {
   if (!isFileVerified) return;
+
+  console.log(`Action received from peer: ${data.action} at ${data.currentTime}`);
 
   isSyncing = true; // Set flag before performing the action
 
@@ -162,12 +167,14 @@ function handleSyncAction(data) {
 // Synchronize play, pause, and seek actions with checks
 videoPlayer.addEventListener('play', () => {
   if (isFileVerified && !isSyncing) { // Check if not syncing
+    console.log('Sending play action to peer');
     ws.send(JSON.stringify({ type: 'sync_action', action: 'play', currentTime: videoPlayer.currentTime }));
   }
 });
 
 videoPlayer.addEventListener('pause', () => {
   if (isFileVerified && !isSyncing) { // Check if not syncing
+    console.log('Sending pause action to peer');
     ws.send(JSON.stringify({ type: 'sync_action', action: 'pause', currentTime: videoPlayer.currentTime }));
   }
 });
@@ -177,6 +184,7 @@ videoPlayer.addEventListener('seeked', () => {
     // Implement debouncing to prevent rapid-fire seek events
     clearTimeout(seekDebounceTimer);
     seekDebounceTimer = setTimeout(() => {
+      console.log('Sending seek action to peer');
       ws.send(JSON.stringify({ type: 'sync_action', action: 'seek', currentTime: videoPlayer.currentTime }));
     }, SEEK_DEBOUNCE_DELAY);
   }
