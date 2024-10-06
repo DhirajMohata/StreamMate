@@ -19,11 +19,12 @@ const chatMessages = document.getElementById('chat-messages');
 const chatInput = document.getElementById('chat-input');
 const sendChatBtn = document.getElementById('send-chat');
 
-// Call Elements (Assuming you have these in your HTML)
-const voiceCallBtn = document.getElementById('voice-call');
-const videoCallBtn = document.getElementById('video-call');
+// Call Elements
+const voiceCallBtn = document.getElementById('voice-call-btn');
+const videoCallBtn = document.getElementById('video-call-btn');
 const localVideo = document.getElementById('local-video');
 const remoteVideo = document.getElementById('remote-video');
+const videoCallContainer = document.getElementById('video-call-container');
 
 let ws;
 let isPeerReady = false;
@@ -49,6 +50,9 @@ let isSyncing = false;
 let seekDebounceTimer = null;
 const SEEK_DEBOUNCE_DELAY = 300; // milliseconds
 
+// Media Streams
+let localStream = null;
+
 // Initialize WebSocket connection
 function initWebSocket() {
   ws = new WebSocket('ws://192.168.61.120:8080'); // Replace with your server's IP
@@ -72,8 +76,6 @@ function initWebSocket() {
       case 'both_joined':
         isPeerReady = true;
         fileSelection.style.display = 'flex'; // Use flex for better alignment
-        // Initialize WebRTC Peer Connection
-        initializePeerConnection();
         break;
 
       case 'file_info':
@@ -89,27 +91,38 @@ function initWebSocket() {
         appendChatMessage('Peer', data.message);
         break;
 
-      case 'ice_candidate':
-        await handleRemoteIceCandidate(data.candidate);
+      case 'offer':
+        await handleOffer(data.offer);
         break;
 
-      case 'error':
-        errorMsg.textContent = data.message;
+      case 'answer':
+        await handleAnswer(data.answer);
+        break;
+
+      case 'ice_candidate':
+        await handleRemoteIceCandidate(data.candidate);
         break;
 
       case 'peer_left':
         errorMsg.textContent = 'Peer has left the room.';
         videoPlayerContainer.style.display = 'none';
         fileSelection.style.display = 'none';
+        videoCallContainer.style.display = 'none';
+        break;
+
+      case 'error':
+        errorMsg.textContent = data.message;
         break;
 
       default:
+        console.log('Unknown message type:', data.type);
         break;
     }
   };
 
   ws.onclose = () => {
     console.log('Disconnected from WebSocket server');
+    errorMsg.textContent = 'Disconnected from server.';
   };
 }
 
@@ -163,57 +176,6 @@ function verifyFiles() {
       fileError.textContent = 'Selected files do not have the same duration.';
       videoPlayerContainer.style.display = 'none'; // Hide the container if verification fails
     }
-  }
-}
-
-// Initialize WebRTC Peer Connection
-function initializePeerConnection() {
-  peerConnection = new RTCPeerConnection(configuration);
-
-  // Handle ICE candidates
-  peerConnection.onicecandidate = (event) => {
-    if (event.candidate) {
-      ws.send(JSON.stringify({ type: 'ice_candidate', candidate: event.candidate }));
-    }
-  };
-
-  // Handle remote stream
-  peerConnection.ontrack = (event) => {
-    if (event.streams && event.streams[0]) {
-      remoteVideo.srcObject = event.streams[0];
-    }
-  };
-
-  // Add local stream if any (for voice/video calls)
-  // This section can be expanded based on call implementations
-}
-
-// Handle incoming ICE candidates
-async function handleRemoteIceCandidate(candidate) {
-  try {
-    if (peerConnection.remoteDescription) {
-      await peerConnection.addIceCandidate(new RTCIceCandidate(candidate));
-    } else {
-      // Queue the candidate if remote description is not set yet
-      iceCandidateQueue.push(candidate);
-    }
-  } catch (error) {
-    console.error('Error adding ICE candidate:', error);
-  }
-}
-
-// After setting remote description, process the queued ICE candidates
-async function setRemoteDescriptionAndProcessQueue(description) {
-  try {
-    await peerConnection.setRemoteDescription(new RTCSessionDescription(description));
-
-    // Process queued ICE candidates
-    while (iceCandidateQueue.length > 0) {
-      const candidate = iceCandidateQueue.shift();
-      await peerConnection.addIceCandidate(new RTCIceCandidate(candidate));
-    }
-  } catch (error) {
-    console.error('Error setting remote description:', error);
   }
 }
 
@@ -300,3 +262,174 @@ function appendChatMessage(sender, message) {
   chatMessages.appendChild(messageElement);
   chatMessages.scrollTop = chatMessages.scrollHeight;
 }
+
+// WebRTC Signaling
+
+// Initialize WebRTC Peer Connection
+function initializePeerConnection() {
+  peerConnection = new RTCPeerConnection(configuration);
+
+  // Handle ICE candidates
+  peerConnection.onicecandidate = (event) => {
+    if (event.candidate) {
+      ws.send(JSON.stringify({ type: 'ice_candidate', candidate: event.candidate }));
+    }
+  };
+
+  // Handle remote stream
+  peerConnection.ontrack = (event) => {
+    if (event.streams && event.streams[0]) {
+      remoteVideo.srcObject = event.streams[0];
+    }
+  };
+
+  // Handle connection state change
+  peerConnection.onconnectionstatechange = () => {
+    console.log('Connection state:', peerConnection.connectionState);
+    if (peerConnection.connectionState === 'connected') {
+      console.log('Peers connected!');
+    } else if (peerConnection.connectionState === 'disconnected' || peerConnection.connectionState === 'failed') {
+      console.log('Peer disconnected.');
+      videoCallContainer.style.display = 'none';
+    }
+  };
+}
+
+// Handle incoming ICE candidates
+async function handleRemoteIceCandidate(candidate) {
+  try {
+    if (peerConnection.remoteDescription && peerConnection.remoteDescription.type) {
+      await peerConnection.addIceCandidate(new RTCIceCandidate(candidate));
+    } else {
+      // Queue the candidate if remote description is not set yet
+      iceCandidateQueue.push(candidate);
+    }
+  } catch (error) {
+    console.error('Error adding ICE candidate:', error);
+  }
+}
+
+// Handle Offer
+async function handleOffer(offer) {
+  try {
+    if (!peerConnection) {
+      initializePeerConnection();
+    }
+    await peerConnection.setRemoteDescription(new RTCSessionDescription(offer));
+    // Add any queued ICE candidates
+    while (iceCandidateQueue.length > 0) {
+      const candidate = iceCandidateQueue.shift();
+      await peerConnection.addIceCandidate(new RTCIceCandidate(candidate));
+    }
+    const answer = await peerConnection.createAnswer();
+    await peerConnection.setLocalDescription(answer);
+    ws.send(JSON.stringify({ type: 'answer', answer }));
+  } catch (error) {
+    console.error('Error handling offer:', error);
+  }
+}
+
+// Handle Answer
+async function handleAnswer(answer) {
+  try {
+    await peerConnection.setRemoteDescription(new RTCSessionDescription(answer));
+    // Add any queued ICE candidates
+    while (iceCandidateQueue.length > 0) {
+      const candidate = iceCandidateQueue.shift();
+      await peerConnection.addIceCandidate(new RTCIceCandidate(candidate));
+    }
+  } catch (error) {
+    console.error('Error handling answer:', error);
+  }
+}
+
+// Initiate Voice Call
+voiceCallBtn.addEventListener('click', async () => {
+  if (!isPeerReady) {
+    alert('Please join a room first.');
+    return;
+  }
+
+  if (peerConnection) {
+    alert('Already in a call.');
+    return;
+  }
+
+  try {
+    // Get user's audio stream
+    localStream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
+    localVideo.srcObject = localStream;
+    localStream.getTracks().forEach(track => peerConnection.addTrack(track, localStream));
+
+    // Initialize Peer Connection
+    initializePeerConnection();
+
+    // Create and send offer
+    const offer = await peerConnection.createOffer();
+    await peerConnection.setLocalDescription(offer);
+    ws.send(JSON.stringify({ type: 'offer', offer }));
+
+    // Show video call container (for audio, only local video will show muted)
+    videoCallContainer.classList.remove('hidden');
+    videoCallContainer.classList.add('flex');
+  } catch (error) {
+    console.error('Error initiating voice call:', error);
+  }
+});
+
+// Initiate Video Call
+videoCallBtn.addEventListener('click', async () => {
+  if (!isPeerReady) {
+    alert('Please join a room first.');
+    return;
+  }
+
+  if (peerConnection) {
+    alert('Already in a call.');
+    return;
+  }
+
+  try {
+    // Get user's video and audio stream
+    localStream = await navigator.mediaDevices.getUserMedia({ audio: true, video: true });
+    localVideo.srcObject = localStream;
+    remoteVideo.srcObject = null; // Clear previous remote stream if any
+
+    // Add tracks to Peer Connection
+    localStream.getTracks().forEach(track => peerConnection.addTrack(track, localStream));
+
+    // Initialize Peer Connection
+    initializePeerConnection();
+
+    // Create and send offer
+    const offer = await peerConnection.createOffer();
+    await peerConnection.setLocalDescription(offer);
+    ws.send(JSON.stringify({ type: 'offer', offer }));
+
+    // Show video call container
+    videoCallContainer.classList.remove('hidden');
+    videoCallContainer.classList.add('flex');
+  } catch (error) {
+    console.error('Error initiating video call:', error);
+  }
+});
+
+// Clean up on peer disconnection
+function handlePeerDisconnection() {
+  if (localStream) {
+    localStream.getTracks().forEach(track => track.stop());
+    localStream = null;
+  }
+  if (peerConnection) {
+    peerConnection.close();
+    peerConnection = null;
+  }
+  videoCallContainer.style.display = 'none';
+}
+
+// Listen for peer disconnection
+ws.addEventListener('close', () => {
+  handlePeerDisconnection();
+});
+
+// Handle Incoming Video Call Offer (Not necessary as handled in onmessage)
