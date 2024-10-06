@@ -1,34 +1,48 @@
-<!-- index.html -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Video Sync Player</title>
-  <style>
-    body { font-family: Arial, sans-serif; padding: 20px; }
-    #controls { margin-bottom: 20px; }
-    #error { color: red; }
-  </style>
+  <script src="https://cdn.tailwindcss.com"></script> <!-- Link to Tailwind CSS build -->
 </head>
-<body>
-  <h1>Video Sync Player</h1>
-  
-  <div id="controls">
-    <button id="create-room">Create Room</button>
-    <input type="text" id="room-id-input" placeholder="Enter Room ID">
-    <button id="join-room">Join Room</button>
-    <p id="room-info"></p>
-    <p id="error"></p>
+<body class="bg-gray-900 text-white font-sans min-h-screen flex flex-col items-center justify-center">
+
+  <!-- Container for the app -->
+  <div class="w-full max-w-3xl mx-auto px-4 py-8 space-y-6 bg-gray-800 rounded-lg shadow-lg">
+    <h1 class="text-3xl font-bold text-center mb-6 text-blue-400">Video Sync Player</h1>
+    
+    <!-- Controls: Create or Join Room -->
+    <div id="controls" class="flex flex-col sm:flex-row justify-center items-center space-y-4 sm:space-y-0 sm:space-x-4 mb-6">
+      <button id="create-room" class="bg-blue-500 hover:bg-blue-600 text-white px-6 py-3 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-300">
+        Create Room
+      </button>
+      <div class="flex items-center space-x-2">
+        <input type="text" id="room-id-input" placeholder="Enter Room ID"
+          class="bg-gray-700 border border-gray-600 text-white rounded-md px-4 py-3 focus:outline-none focus:border-blue-400 focus:ring-1 focus:ring-blue-400">
+        <button id="join-room" class="bg-green-500 hover:bg-green-600 text-white px-6 py-3 rounded-md focus:outline-none focus:ring-2 focus:ring-green-300">
+          Join Room
+        </button>
+      </div>
+    </div>
+
+    <!-- Room Info -->
+    <p id="room-info" class="text-center text-lg text-green-400"></p>
+    <p id="error" class="text-center text-red-500"></p>
+
+    <!-- File Selection -->
+    <div id="file-selection" class="flex flex-col items-center space-y-4" style="display: none;">
+      <input type="file" id="file-input" accept="video/*"
+        class="block w-full text-sm text-gray-300 file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-semibold file:bg-blue-700 file:text-white hover:file:bg-blue-800">
+      <p id="file-error" class="text-red-500"></p>
+    </div>
+
+    <!-- Video Player -->
+    <div class="w-full flex justify-center mt-8" style="display: none;" id="video-player-container">
+      <video id="video-player" controls class="w-full max-w-2xl bg-black rounded-md shadow-lg"></video>
+    </div>
   </div>
-  
-  <div id="file-selection" style="display: none;">
-    <input type="file" id="file-input" accept="video/*">
-    <p id="file-error" style="color: red;"></p>
-  </div>
-  
-  <video id="video-player" controls width="600" style="display: none;"></video>
-  
+
   <script src="renderer.js"></script>
 </body>
 </html>
