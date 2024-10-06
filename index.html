@@ -4,45 +4,66 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Video Sync Player</title>
-  <script src="https://cdn.tailwindcss.com"></script> <!-- Link to Tailwind CSS build -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {},
+      }
+    }
+  </script>
+  <style>
+    body {
+      transition: background-color 0.3s, color 0.3s;
+    }
+  </style>
 </head>
-<body class="bg-gray-900 text-white font-sans min-h-screen flex flex-col items-center justify-center">
+<body class="bg-gray-900 text-white font-sans min-h-screen flex flex-col items-center justify-center transition-colors duration-300" id="app-body">
+
+  <!-- Dark/Light Mode Toggle Button -->
+  <button id="theme-toggle" class="absolute top-4 right-4 p-2 rounded-full bg-gray-700 hover:bg-gray-600 focus:outline-none">
+    <svg id="theme-icon" xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m8.66-4.34l-.71.71m-13.9 0l-.71-.71m16.72-10.97l-.71-.71M4.93 4.93l-.71.71m12.02 12.02a9 9 0 11-12.73-12.73 9 9 0 0112.73 12.73z" />
+    </svg>
+  </button>
 
   <!-- Container for the app -->
-  <div class="w-full max-w-3xl mx-auto px-4 py-8 space-y-6 bg-gray-800 rounded-lg shadow-lg">
-    <h1 class="text-3xl font-bold text-center mb-6 text-blue-400">Video Sync Player</h1>
+  <div class="w-full max-w-3xl mx-auto px-4 py-8 space-y-6 bg-gray-800 dark:bg-gray-100 text-gray-100 dark:text-gray-800 rounded-lg shadow-lg" id="main-container">
+    <h1 class="text-3xl font-bold text-center mb-6 text-blue-400 dark:text-blue-600">Video Sync Player</h1>
     
     <!-- Controls: Create or Join Room -->
     <div id="controls" class="flex flex-col sm:flex-row justify-center items-center space-y-4 sm:space-y-0 sm:space-x-4 mb-6">
-      <button id="create-room" class="bg-blue-500 hover:bg-blue-600 text-white px-6 py-3 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-300">
+      <button id="create-room" class="bg-blue-500 hover:bg-blue-600 text-white dark:bg-blue-400 dark:hover:bg-blue-500 dark:text-gray-900 px-6 py-3 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-300">
         Create Room
       </button>
       <div class="flex items-center space-x-2">
         <input type="text" id="room-id-input" placeholder="Enter Room ID"
-          class="bg-gray-700 border border-gray-600 text-white rounded-md px-4 py-3 focus:outline-none focus:border-blue-400 focus:ring-1 focus:ring-blue-400">
-        <button id="join-room" class="bg-green-500 hover:bg-green-600 text-white px-6 py-3 rounded-md focus:outline-none focus:ring-2 focus:ring-green-300">
+          class="bg-gray-700 dark:bg-gray-200 border border-gray-600 dark:border-gray-400 text-white dark:text-gray-800 rounded-md px-4 py-3 focus:outline-none focus:border-blue-400 focus:ring-1 focus:ring-blue-400">
+        <button id="join-room" class="bg-green-500 hover:bg-green-600 text-white dark:bg-green-400 dark:hover:bg-green-500 dark:text-gray-900 px-6 py-3 rounded-md focus:outline-none focus:ring-2 focus:ring-green-300">
           Join Room
         </button>
       </div>
     </div>
 
     <!-- Room Info -->
-    <p id="room-info" class="text-center text-lg text-green-400"></p>
-    <p id="error" class="text-center text-red-500"></p>
+    <p id="room-info" class="text-center text-lg text-green-400 dark:text-green-600"></p>
+    <p id="error" class="text-center text-red-500 dark:text-red-600"></p>
 
     <!-- File Selection -->
     <div id="file-selection" class="flex flex-col items-center space-y-4" style="display: none;">
       <input type="file" id="file-input" accept="video/*"
-        class="block w-full text-sm text-gray-300 file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-semibold file:bg-blue-700 file:text-white hover:file:bg-blue-800">
-      <p id="file-error" class="text-red-500"></p>
+        class="block w-full text-sm text-gray-300 dark:text-gray-800 file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-semibold file:bg-blue-700 file:text-white hover:file:bg-blue-800 dark:file:bg-blue-400 dark:file:text-gray-900 dark:hover:file:bg-blue-500">
+      <p id="file-error" class="text-red-500 dark:text-red-600"></p>
     </div>
 
     <!-- Video Player -->
     <div class="w-full flex justify-center mt-8" style="display: none;" id="video-player-container">
-      <video id="video-player" controls class="w-full max-w-2xl bg-black rounded-md shadow-lg"></video>
+      <video id="video-player" controls class="w-full max-w-2xl bg-black dark:bg-gray-200 rounded-md shadow-lg"></video>
     </div>
   </div>
 
   <script src="renderer.js"></script>
+  <script src="theme-toggle.js"></script>
 </body>
 </html>
