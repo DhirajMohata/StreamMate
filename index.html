@@ -17,6 +17,14 @@
     body {
       transition: background-color 0.3s, color 0.3s;
     }
+    /* Draggable Popup Styles */
+    .draggable {
+      position: absolute;
+      top: 20px;
+      left: 20px;
+      z-index: 1000;
+      cursor: move;
+    }
   </style>
 </head>
 <body class="bg-gray-900 text-white font-sans min-h-screen flex flex-col items-center justify-center transition-colors duration-300" id="app-body">
@@ -32,8 +40,8 @@
   <!-- Container for the app with chat sidebar -->
   <div class="w-full max-w-5xl mx-auto px-4 py-8 space-y-6 bg-gray-800 dark:bg-gray-100 text-gray-100 dark:text-gray-800 rounded-lg shadow-lg flex flex-col md:flex-row">
     
-    <!-- Main Content -->
-    <div class="w-full md:w-3/4 space-y-6">
+    <!-- Main Content (70%) -->
+    <div class="w-full md:w-7/10 space-y-6">
       <h1 class="text-3xl font-bold text-center mb-6 text-blue-400 dark:text-blue-600">Video Sync Player</h1>
       
       <!-- Controls: Create or Join Room -->
@@ -63,12 +71,12 @@
 
       <!-- Video Player -->
       <div class="w-full flex justify-center mt-8" style="display: none;" id="video-player">
-        <video id="video-player-main" controls class="w-full max-w-2xl bg-black dark:bg-gray-200 rounded-md shadow-lg"></video>
+        <video id="video-player-main" controls class="w-full max-w-4xl bg-black dark:bg-gray-200 rounded-md shadow-lg"></video>
       </div>
     </div>
     
-    <!-- Chat Sidebar -->
-    <div class="w-full md:w-1/4 mt-8 md:mt-0 md:ml-6 bg-gray-700 dark:bg-gray-300 p-4 rounded-md shadow-inner flex flex-col">
+    <!-- Chat Sidebar (30%) -->
+    <div class="w-full md:w-3/10 mt-8 md:mt-0 md:ml-6 bg-gray-700 dark:bg-gray-300 p-4 rounded-md shadow-inner flex flex-col">
       
       <!-- Chat Header with Voice and Video Call Buttons -->
       <div class="flex justify-between items-center mb-4">
@@ -103,12 +111,25 @@
         </button>
       </div>
       
-      <!-- Video Call Container -->
-      <div id="video-call-container" class="mt-4 hidden flex-col items-center space-y-2">
-        <video id="local-video" autoplay muted class="w-32 h-24 bg-black rounded-md shadow-lg"></video>
-        <video id="remote-video" autoplay class="w-32 h-24 bg-black rounded-md shadow-lg"></video>
+      <!-- Video Call Container (Draggable Popup) -->
+      <div id="video-call-popup" class="draggable hidden bg-gray-800 dark:bg-gray-200 p-4 rounded-md shadow-lg">
+        <div class="flex justify-between items-center mb-2">
+          <h3 class="text-lg font-semibold text-blue-400 dark:text-blue-600">Video Call</h3>
+          <button id="close-call" class="text-red-500 hover:text-red-600 focus:outline-none">
+            <!-- Close Icon -->
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
+        </div>
+        <div class="flex space-x-4">
+          <video id="local-video" autoplay muted class="w-32 h-24 bg-black rounded-md shadow-lg"></video>
+          <video id="remote-video" autoplay class="w-32 h-24 bg-black rounded-md shadow-lg"></video>
+        </div>
       </div>
     </div>
+
+    <!-- Chat Sidebar Draggable Popup (if needed) -->
     
   </div>
 
@@ -116,3 +137,4 @@
   <script src="theme-toggle.js"></script>
 </body>
 </html>
+  

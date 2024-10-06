@@ -13,6 +13,7 @@ server.on('connection', (socket) => {
       data = JSON.parse(message);
     } catch (error) {
       console.error('Invalid JSON:', error);
+      socket.send(JSON.stringify({ type: 'error', message: 'Invalid JSON format.' }));
       return;
     }
 
@@ -70,6 +71,7 @@ server.on('connection', (socket) => {
 
       default:
         console.log('Unknown message type:', data.type);
+        socket.send(JSON.stringify({ type: 'error', message: 'Unknown message type.' }));
         break;
     }
   });

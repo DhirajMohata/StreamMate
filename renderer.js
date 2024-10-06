@@ -23,7 +23,8 @@ const voiceCallBtn = document.getElementById('voice-call-btn');
 const videoCallBtn = document.getElementById('video-call-btn');
 const localVideo = document.getElementById('local-video');
 const remoteVideo = document.getElementById('remote-video');
-const videoCallContainer = document.getElementById('video-call-container');
+const videoCallPopup = document.getElementById('video-call-popup');
+const closeCallBtn = document.getElementById('close-call');
 
 let isPeerReady = false;
 let isFileVerified = false;
@@ -53,7 +54,7 @@ let localStream = null;
 
 // Initialize WebSocket
 function initializeWebSocket() {
-  window.electronAPI.initializeWebSocket('ws://192.168.61.120:8080'); // Replace with your server's IP
+  window.electronAPI.initializeWebSocket('ws://192.168.61.120:8080'); // Replace with your server's IP if needed
 }
 
 initializeWebSocket();
@@ -79,7 +80,7 @@ window.electronAPI.onMessage((message) => {
 
     case 'both_joined':
       isPeerReady = true;
-      fileSelection.style.display = 'flex'; // Use flex for better alignment
+      fileSelection.style.display = 'flex'; // Show file selection
       break;
 
     case 'file_info':
@@ -377,9 +378,8 @@ voiceCallBtn.addEventListener('click', async () => {
     await peerConnection.setLocalDescription(offer);
     window.electronAPI.sendMessage(JSON.stringify({ type: 'offer', offer }));
 
-    // Show video call container (for audio, only local video will show muted)
-    videoCallContainer.classList.remove('hidden');
-    videoCallContainer.classList.add('flex');
+    // Show video call popup (audio-only)
+    showVideoCallPopup();
   } catch (error) {
     console.error('Error initiating voice call:', error);
     alert('Failed to initiate voice call. Please check your microphone settings.');
@@ -415,13 +415,23 @@ videoCallBtn.addEventListener('click', async () => {
     await peerConnection.setLocalDescription(offer);
     window.electronAPI.sendMessage(JSON.stringify({ type: 'offer', offer }));
 
-    // Show video call container
-    videoCallContainer.classList.remove('hidden');
-    videoCallContainer.classList.add('flex');
+    // Show video call popup
+    showVideoCallPopup();
   } catch (error) {
     console.error('Error initiating video call:', error);
     alert('Failed to initiate video call. Please check your camera and microphone settings.');
   }
+});
+
+// Show Video Call Popup
+function showVideoCallPopup() {
+  videoCallPopup.classList.remove('hidden');
+  videoCallPopup.classList.add('flex');
+}
+
+// Close Video Call Popup
+closeCallBtn.addEventListener('click', () => {
+  handlePeerDisconnection();
 });
 
 // Clean up on peer disconnection
@@ -434,7 +444,8 @@ function handlePeerDisconnection() {
     peerConnection.close();
     peerConnection = null;
   }
-  videoCallContainer.style.display = 'none';
+  videoCallPopup.classList.add('hidden');
+  videoCallPopup.classList.remove('flex');
 }
 
 // Handle server disconnection
@@ -448,7 +459,39 @@ function handleServerError(message) {
   errorMsg.textContent = `Server Error: ${message}`;
 }
 
-// Handle incoming WebSocket connection close
-window.addEventListener('beforeunload', () => {
-  window.electronAPI.sendMessage(JSON.stringify({ type: 'disconnect' }));
-});
+// Draggable Video Call Popup
+makeDraggable(document.getElementById("video-call-popup"));
+
+// Function to make an element draggable
+function makeDraggable(element) {
+  let isDragging = false;
+  let startX, startY, initialX, initialY;
+
+  const handleMouseDown = (e) => {
+    isDragging = true;
+    startX = e.clientX;
+    startY = e.clientY;
+    const rect = element.getBoundingClientRect();
+    initialX = rect.left;
+    initialY = rect.top;
+    document.addEventListener('mousemove', handleMouseMove);
+    document.addEventListener('mouseup', handleMouseUp);
+  };
+
+  const handleMouseMove = (e) => {
+    if (isDragging) {
+      const dx = e.clientX - startX;
+      const dy = e.clientY - startY;
+      element.style.left = `${initialX + dx}px`;
+      element.style.top = `${initialY + dy}px`;
+    }
+  };
+
+  const handleMouseUp = () => {
+    isDragging = false;
+    document.removeEventListener('mousemove', handleMouseMove);
+    document.removeEventListener('mouseup', handleMouseUp);
+  };
+
+  element.addEventListener('mousedown', handleMouseDown);
+}
