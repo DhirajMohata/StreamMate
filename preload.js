@@ -2,10 +2,12 @@
 const { contextBridge, ipcRenderer } = require('electron');
 
 contextBridge.exposeInMainWorld('electronAPI', {
-  // WebSocket Functions
+  // Initialize WebSocket connection
   initializeWebSocket: (url) => ipcRenderer.send('initialize-websocket', url),
+
+  // Send messages through WebSocket
   sendMessage: (message) => ipcRenderer.send('send-message', message),
-  onMessage: (callback) => ipcRenderer.on('receive-message', (event, message) => callback(message)),
-  
-  // Additional APIs can be exposed here as needed
+
+  // Receive messages from WebSocket
+  onMessage: (callback) => ipcRenderer.on('receive-message', (event, message) => callback(message))
 });

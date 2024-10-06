@@ -3,7 +3,7 @@ const { app, BrowserWindow, ipcMain } = require('electron');
 const path = require('path');
 const WebSocket = require('ws'); // Ensure ws is installed: npm install ws
 
-let ws; // WebSocket server instance
+let wsClient; // WebSocket client instance
 
 function createWindow () {
   const win = new BrowserWindow({
@@ -11,7 +11,7 @@ function createWindow () {
     height: 800,
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'), // Specify preload.js
-      nodeIntegration: false, // Disable Node.js integration
+      nodeIntegration: false, // Disable Node.js integration for security
       contextIsolation: true, // Enable context isolation
       enableRemoteModule: false, // Disable remote module for security
     }
@@ -25,32 +25,37 @@ function createWindow () {
 
 // Handle WebSocket Initialization
 ipcMain.on('initialize-websocket', (event, url) => {
-  if (ws) {
-    ws.close();
+  if (wsClient) {
+    wsClient.close();
   }
-  ws = new WebSocket(url);
+  wsClient = new WebSocket(url);
 
-  ws.on('open', () => {
+  wsClient.on('open', () => {
     console.log('WebSocket connected');
   });
 
-  ws.on('message', (data) => {
+  wsClient.on('message', (data) => {
     event.sender.send('receive-message', data.toString());
   });
 
-  ws.on('close', () => {
+  wsClient.on('close', () => {
     console.log('WebSocket disconnected');
+    event.sender.send('receive-message', JSON.stringify({ type: 'server_disconnected' }));
   });
 
-  ws.on('error', (error) => {
+  wsClient.on('error', (error) => {
     console.error('WebSocket error:', error);
+    event.sender.send('receive-message', JSON.stringify({ type: 'server_error', message: error.message }));
   });
 });
 
 // Handle Sending Messages through WebSocket
 ipcMain.on('send-message', (event, message) => {
-  if (ws && ws.readyState === WebSocket.OPEN) {
-    ws.send(message);
+  if (wsClient && wsClient.readyState === WebSocket.OPEN) {
+    wsClient.send(message);
+  } else {
+    console.error('WebSocket is not connected. Unable to send message:', message);
+    event.sender.send('receive-message', JSON.stringify({ type: 'error', message: 'WebSocket is not connected.' }));
   }
 });
 

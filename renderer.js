@@ -1,5 +1,4 @@
 // renderer.js
-const { ipcRenderer } = require('electron');
 
 // UI Elements
 const videoPlayerContainer = document.getElementById('video-player'); // Container div
@@ -26,7 +25,6 @@ const localVideo = document.getElementById('local-video');
 const remoteVideo = document.getElementById('remote-video');
 const videoCallContainer = document.getElementById('video-call-container');
 
-let ws;
 let isPeerReady = false;
 let isFileVerified = false;
 let localDuration = null;
@@ -53,84 +51,87 @@ const SEEK_DEBOUNCE_DELAY = 300; // milliseconds
 // Media Streams
 let localStream = null;
 
-// Initialize WebSocket connection
-function initWebSocket() {
-  ws = new WebSocket('ws://192.168.61.120:8080'); // Replace with your server's IP
-
-  ws.onopen = () => {
-    console.log('Connected to WebSocket server');
-  };
-
-  ws.onmessage = async (message) => {
-    const data = JSON.parse(message.data);
-
-    switch (data.type) {
-      case 'room_created':
-        roomInfo.textContent = `Room Created. ID: ${data.roomId}`;
-        break;
-
-      case 'room_joined':
-        roomInfo.textContent = `Joined Room: ${data.roomId}`;
-        break;
-
-      case 'both_joined':
-        isPeerReady = true;
-        fileSelection.style.display = 'flex'; // Use flex for better alignment
-        break;
-
-      case 'file_info':
-        remoteDuration = data.duration;
-        verifyFiles();
-        break;
-
-      case 'sync_action':
-        handleSyncAction(data);
-        break;
-
-      case 'chat_message':
-        appendChatMessage('Peer', data.message);
-        break;
-
-      case 'offer':
-        await handleOffer(data.offer);
-        break;
-
-      case 'answer':
-        await handleAnswer(data.answer);
-        break;
-
-      case 'ice_candidate':
-        await handleRemoteIceCandidate(data.candidate);
-        break;
-
-      case 'peer_left':
-        errorMsg.textContent = 'Peer has left the room.';
-        videoPlayerContainer.style.display = 'none';
-        fileSelection.style.display = 'none';
-        videoCallContainer.style.display = 'none';
-        break;
-
-      case 'error':
-        errorMsg.textContent = data.message;
-        break;
-
-      default:
-        console.log('Unknown message type:', data.type);
-        break;
-    }
-  };
-
-  ws.onclose = () => {
-    console.log('Disconnected from WebSocket server');
-    errorMsg.textContent = 'Disconnected from server.';
-  };
+// Initialize WebSocket
+function initializeWebSocket() {
+  window.electronAPI.initializeWebSocket('ws://192.168.61.120:8080'); // Replace with your server's IP
 }
 
-initWebSocket();
+initializeWebSocket();
+
+// Handle incoming WebSocket messages
+window.electronAPI.onMessage((message) => {
+  let data;
+  try {
+    data = JSON.parse(message);
+  } catch (error) {
+    console.error('Invalid JSON:', error);
+    return;
+  }
+
+  switch (data.type) {
+    case 'room_created':
+      roomInfo.textContent = `Room Created. ID: ${data.roomId}`;
+      break;
+
+    case 'room_joined':
+      roomInfo.textContent = `Joined Room: ${data.roomId}`;
+      break;
+
+    case 'both_joined':
+      isPeerReady = true;
+      fileSelection.style.display = 'flex'; // Use flex for better alignment
+      break;
+
+    case 'file_info':
+      remoteDuration = data.duration;
+      verifyFiles();
+      break;
+
+    case 'sync_action':
+      handleSyncAction(data);
+      break;
+
+    case 'chat_message':
+      appendChatMessage('Peer', data.message);
+      break;
+
+    case 'offer':
+      handleOffer(data.offer);
+      break;
+
+    case 'answer':
+      handleAnswer(data.answer);
+      break;
+
+    case 'ice_candidate':
+      handleRemoteIceCandidate(data.candidate);
+      break;
+
+    case 'peer_left':
+      handlePeerDisconnection();
+      break;
+
+    case 'error':
+      errorMsg.textContent = data.message;
+      break;
+
+    case 'server_disconnected':
+      handleServerDisconnection();
+      break;
+
+    case 'server_error':
+      handleServerError(data.message);
+      break;
+
+    default:
+      console.log('Unknown message type:', data.type);
+      break;
+  }
+});
 
 // Room creation
 createRoomBtn.addEventListener('click', () => {
-  ws.send(JSON.stringify({ type: 'create_room' }));
+  window.electronAPI.sendMessage(JSON.stringify({ type: 'create_room' }));
   errorMsg.textContent = '';
 });
 
@@ -138,7 +139,7 @@ createRoomBtn.addEventListener('click', () => {
 joinRoomBtn.addEventListener('click', () => {
   const roomId = roomIdInput.value.trim();
   if (roomId) {
-    ws.send(JSON.stringify({ type: 'join_room', roomId }));
+    window.electronAPI.sendMessage(JSON.stringify({ type: 'join_room', roomId }));
     errorMsg.textContent = '';
   } else {
     errorMsg.textContent = 'Please enter a Room ID to join.';
@@ -157,7 +158,7 @@ fileInput.addEventListener('change', (event) => {
     // Get video duration
     videoPlayer.onloadedmetadata = () => {
       localDuration = videoPlayer.duration;
-      ws.send(JSON.stringify({ type: 'file_info', duration: localDuration }));
+      window.electronAPI.sendMessage(JSON.stringify({ type: 'file_info', duration: localDuration }));
       verifyFiles();
     };
   }
@@ -213,14 +214,14 @@ function handleSyncAction(data) {
 videoPlayer.addEventListener('play', () => {
   if (isFileVerified && !isSyncing) { // Check if not syncing
     console.log('Sending play action to peer');
-    ws.send(JSON.stringify({ type: 'sync_action', action: 'play', currentTime: videoPlayer.currentTime }));
+    window.electronAPI.sendMessage(JSON.stringify({ type: 'sync_action', action: 'play', currentTime: videoPlayer.currentTime }));
   }
 });
 
 videoPlayer.addEventListener('pause', () => {
   if (isFileVerified && !isSyncing) { // Check if not syncing
     console.log('Sending pause action to peer');
-    ws.send(JSON.stringify({ type: 'sync_action', action: 'pause', currentTime: videoPlayer.currentTime }));
+    window.electronAPI.sendMessage(JSON.stringify({ type: 'sync_action', action: 'pause', currentTime: videoPlayer.currentTime }));
   }
 });
 
@@ -230,7 +231,7 @@ videoPlayer.addEventListener('seeked', () => {
     clearTimeout(seekDebounceTimer);
     seekDebounceTimer = setTimeout(() => {
       console.log('Sending seek action to peer');
-      ws.send(JSON.stringify({ type: 'sync_action', action: 'seek', currentTime: videoPlayer.currentTime }));
+      window.electronAPI.sendMessage(JSON.stringify({ type: 'sync_action', action: 'seek', currentTime: videoPlayer.currentTime }));
     }, SEEK_DEBOUNCE_DELAY);
   }
 });
@@ -242,7 +243,7 @@ sendChatBtn.addEventListener('click', () => {
   const message = chatInput.value.trim();
   if (message && isPeerReady) {
     const chatData = { type: 'chat_message', message };
-    ws.send(JSON.stringify(chatData));
+    window.electronAPI.sendMessage(JSON.stringify(chatData));
     appendChatMessage('You', message);
     chatInput.value = '';
   }
@@ -267,12 +268,17 @@ function appendChatMessage(sender, message) {
 
 // Initialize WebRTC Peer Connection
 function initializePeerConnection() {
+  if (peerConnection) {
+    console.warn('PeerConnection already exists');
+    return;
+  }
+
   peerConnection = new RTCPeerConnection(configuration);
 
   // Handle ICE candidates
   peerConnection.onicecandidate = (event) => {
     if (event.candidate) {
-      ws.send(JSON.stringify({ type: 'ice_candidate', candidate: event.candidate }));
+      window.electronAPI.sendMessage(JSON.stringify({ type: 'ice_candidate', candidate: event.candidate }));
     }
   };
 
@@ -290,23 +296,9 @@ function initializePeerConnection() {
       console.log('Peers connected!');
     } else if (peerConnection.connectionState === 'disconnected' || peerConnection.connectionState === 'failed') {
       console.log('Peer disconnected.');
-      videoCallContainer.style.display = 'none';
+      handlePeerDisconnection();
     }
   };
-}
-
-// Handle incoming ICE candidates
-async function handleRemoteIceCandidate(candidate) {
-  try {
-    if (peerConnection.remoteDescription && peerConnection.remoteDescription.type) {
-      await peerConnection.addIceCandidate(new RTCIceCandidate(candidate));
-    } else {
-      // Queue the candidate if remote description is not set yet
-      iceCandidateQueue.push(candidate);
-    }
-  } catch (error) {
-    console.error('Error adding ICE candidate:', error);
-  }
 }
 
 // Handle Offer
@@ -323,7 +315,7 @@ async function handleOffer(offer) {
     }
     const answer = await peerConnection.createAnswer();
     await peerConnection.setLocalDescription(answer);
-    ws.send(JSON.stringify({ type: 'answer', answer }));
+    window.electronAPI.sendMessage(JSON.stringify({ type: 'answer', answer }));
   } catch (error) {
     console.error('Error handling offer:', error);
   }
@@ -343,6 +335,20 @@ async function handleAnswer(answer) {
   }
 }
 
+// Handle Remote ICE Candidate
+async function handleRemoteIceCandidate(candidate) {
+  try {
+    if (peerConnection.remoteDescription && peerConnection.remoteDescription.type) {
+      await peerConnection.addIceCandidate(new RTCIceCandidate(candidate));
+    } else {
+      // Queue the candidate if remote description is not set yet
+      iceCandidateQueue.push(candidate);
+    }
+  } catch (error) {
+    console.error('Error adding ICE candidate:', error);
+  }
+}
+
 // Initiate Voice Call
 voiceCallBtn.addEventListener('click', async () => {
   if (!isPeerReady) {
@@ -359,21 +365,24 @@ voiceCallBtn.addEventListener('click', async () => {
     // Get user's audio stream
     localStream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
     localVideo.srcObject = localStream;
-    localStream.getTracks().forEach(track => peerConnection.addTrack(track, localStream));
 
     // Initialize Peer Connection
     initializePeerConnection();
 
+    // Add audio tracks to Peer Connection
+    localStream.getTracks().forEach(track => peerConnection.addTrack(track, localStream));
+
     // Create and send offer
     const offer = await peerConnection.createOffer();
     await peerConnection.setLocalDescription(offer);
-    ws.send(JSON.stringify({ type: 'offer', offer }));
+    window.electronAPI.sendMessage(JSON.stringify({ type: 'offer', offer }));
 
     // Show video call container (for audio, only local video will show muted)
     videoCallContainer.classList.remove('hidden');
     videoCallContainer.classList.add('flex');
   } catch (error) {
     console.error('Error initiating voice call:', error);
+    alert('Failed to initiate voice call. Please check your microphone settings.');
   }
 });
 
@@ -395,22 +404,23 @@ videoCallBtn.addEventListener('click', async () => {
     localVideo.srcObject = localStream;
     remoteVideo.srcObject = null; // Clear previous remote stream if any
 
-    // Add tracks to Peer Connection
-    localStream.getTracks().forEach(track => peerConnection.addTrack(track, localStream));
-
     // Initialize Peer Connection
     initializePeerConnection();
+
+    // Add video and audio tracks to Peer Connection
+    localStream.getTracks().forEach(track => peerConnection.addTrack(track, localStream));
 
     // Create and send offer
     const offer = await peerConnection.createOffer();
     await peerConnection.setLocalDescription(offer);
-    ws.send(JSON.stringify({ type: 'offer', offer }));
+    window.electronAPI.sendMessage(JSON.stringify({ type: 'offer', offer }));
 
     // Show video call container
     videoCallContainer.classList.remove('hidden');
     videoCallContainer.classList.add('flex');
   } catch (error) {
     console.error('Error initiating video call:', error);
+    alert('Failed to initiate video call. Please check your camera and microphone settings.');
   }
 });
 
@@ -427,9 +437,18 @@ function handlePeerDisconnection() {
   videoCallContainer.style.display = 'none';
 }
 
-// Listen for peer disconnection
-ws.addEventListener('close', () => {
+// Handle server disconnection
+function handleServerDisconnection() {
+  errorMsg.textContent = 'Disconnected from server.';
   handlePeerDisconnection();
-});
+}
 
-// Handle Incoming Video Call Offer (Not necessary as handled in onmessage)
+// Handle server errors
+function handleServerError(message) {
+  errorMsg.textContent = `Server Error: ${message}`;
+}
+
+// Handle incoming WebSocket connection close
+window.addEventListener('beforeunload', () => {
+  window.electronAPI.sendMessage(JSON.stringify({ type: 'disconnect' }));
+});

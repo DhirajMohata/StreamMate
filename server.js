@@ -8,71 +8,68 @@ server.on('connection', (socket) => {
   socket.roomId = null;
 
   socket.on('message', (message) => {
-    const data = JSON.parse(message);
+    let data;
+    try {
+      data = JSON.parse(message);
+    } catch (error) {
+      console.error('Invalid JSON:', error);
+      return;
+    }
 
     switch (data.type) {
       case 'create_room':
-        const roomId = `room_${Math.random().toString(36).substr(2, 9)}`;
-        rooms[roomId] = [socket];
-        socket.roomId = roomId;
-        socket.send(JSON.stringify({ type: 'room_created', roomId }));
+        createRoom(socket);
         break;
 
       case 'join_room':
-        const joinRoomId = data.roomId;
-        if (rooms[joinRoomId] && rooms[joinRoomId].length < 2) {
-          rooms[joinRoomId].push(socket);
-          socket.roomId = joinRoomId;
-          socket.send(JSON.stringify({ type: 'room_joined', roomId: joinRoomId }));
-          rooms[joinRoomId].forEach(client => {
-            client.send(JSON.stringify({ type: 'both_joined' }));
-          });
-        } else {
-          socket.send(JSON.stringify({ type: 'error', message: 'Room not found or full.' }));
-        }
+        joinRoom(socket, data.roomId);
         break;
 
       case 'file_info':
-        const currentRoom = rooms[socket.roomId];
-        if (currentRoom) {
-          currentRoom.forEach(client => {
-            if (client !== socket && client.readyState === WebSocket.OPEN) {
-              client.send(JSON.stringify({ type: 'file_info', duration: data.duration }));
-            }
-          });
-        }
+        broadcastToRoom(socket.roomId, {
+          type: 'file_info',
+          duration: data.duration
+        }, socket);
         break;
 
       case 'sync_action':
-        const syncRoom = rooms[socket.roomId];
-        if (syncRoom) {
-          syncRoom.forEach(client => {
-            if (client !== socket && client.readyState === WebSocket.OPEN) {
-              client.send(JSON.stringify({
-                type: 'sync_action',
-                action: data.action,
-                currentTime: data.currentTime
-              }));
-            }
-          });
-        }
+        broadcastToRoom(socket.roomId, {
+          type: 'sync_action',
+          action: data.action,
+          currentTime: data.currentTime
+        }, socket);
         break;
-      
+
       case 'chat_message':
-        const chatRoom = rooms[socket.roomId];
-        if (chatRoom) {
-          chatRoom.forEach(client => {
-            if (client !== socket && client.readyState === WebSocket.OPEN) {
-              client.send(JSON.stringify({
-                type: 'chat_message',
-                message: data.message
-              }));
-            }
-          });
-        }
+        broadcastToRoom(socket.roomId, {
+          type: 'chat_message',
+          message: data.message
+        }, socket);
+        break;
+
+      case 'offer':
+        broadcastToRoom(socket.roomId, {
+          type: 'offer',
+          offer: data.offer
+        }, socket);
+        break;
+
+      case 'answer':
+        broadcastToRoom(socket.roomId, {
+          type: 'answer',
+          answer: data.answer
+        }, socket);
+        break;
+
+      case 'ice_candidate':
+        broadcastToRoom(socket.roomId, {
+          type: 'ice_candidate',
+          candidate: data.candidate
+        }, socket);
         break;
 
       default:
+        console.log('Unknown message type:', data.type);
         break;
     }
   });
@@ -80,14 +77,43 @@ server.on('connection', (socket) => {
   socket.on('close', () => {
     if (socket.roomId && rooms[socket.roomId]) {
       rooms[socket.roomId] = rooms[socket.roomId].filter(client => client !== socket);
-      rooms[socket.roomId].forEach(client => {
-        client.send(JSON.stringify({ type: 'peer_left' }));
-      });
+      broadcastToRoom(socket.roomId, { type: 'peer_left' }, socket);
       if (rooms[socket.roomId].length === 0) {
         delete rooms[socket.roomId];
       }
     }
   });
 });
+
+function createRoom(socket) {
+  const roomId = `room_${Math.random().toString(36).substr(2, 9)}`;
+  rooms[roomId] = [socket];
+  socket.roomId = roomId;
+  socket.send(JSON.stringify({ type: 'room_created', roomId }));
+  console.log(`Room created: ${roomId}`);
+}
+
+function joinRoom(socket, roomId) {
+  if (rooms[roomId] && rooms[roomId].length < 2) {
+    rooms[roomId].push(socket);
+    socket.roomId = roomId;
+    socket.send(JSON.stringify({ type: 'room_joined', roomId }));
+    broadcastToRoom(roomId, { type: 'both_joined' }, socket);
+    console.log(`Socket joined room: ${roomId}`);
+  } else {
+    socket.send(JSON.stringify({ type: 'error', message: 'Room not found or full.' }));
+    console.log(`Failed to join room: ${roomId}`);
+  }
+}
+
+function broadcastToRoom(roomId, message, senderSocket) {
+  if (rooms[roomId]) {
+    rooms[roomId].forEach(client => {
+      if (client !== senderSocket && client.readyState === WebSocket.OPEN) {
+        client.send(JSON.stringify(message));
+      }
+    });
+  }
+}
 
 console.log('WebSocket server is running on ws://localhost:8080');
