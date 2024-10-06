@@ -30,7 +30,7 @@
   </button>
 
   <!-- Landing Container -->
-  <div class="w-full max-w-md px-6 py-8 bg-gray-800 dark:bg-gray-100 text-gray-100 dark:text-gray-800 rounded-lg shadow-lg">
+  <div id="landing-container" class="w-full max-w-md px-6 py-8 bg-gray-800 dark:bg-gray-100 text-gray-100 dark:text-gray-800 rounded-lg shadow-lg">
     <h1 class="text-2xl font-bold text-center mb-6 text-blue-400 dark:text-blue-600">Welcome to Video Sync App</h1>
     
     <!-- Create Room Button -->
@@ -46,9 +46,55 @@
         Join Room
       </button>
     </div>
-    <p id="room-info"  class="text-center text-white dark:text-white mt-4"></p>
+    
     <!-- Error Message -->
     <p id="error" class="text-center text-red-500 dark:text-red-600 mt-4"></p>
+  </div>
+
+  <!-- Room Container (Initially Hidden) -->
+  <div id="room-container" class="w-full max-w-7xl px-6 py-8 bg-gray-800 dark:bg-gray-100 text-gray-100 dark:text-gray-800 rounded-lg shadow-lg hidden">
+    <h2 id="room-name" class="text-2xl font-semibold mb-6 text-blue-400 dark:text-blue-600">Room: </h2>
+    
+    <div class="flex flex-col md:flex-row">
+      
+      <!-- Video Player Section (75%) -->
+      <div class="w-full md:w-3/4 p-4">
+        <!-- File Selection -->
+        <div id="file-selection" class="flex flex-col items-center space-y-4 mb-4" style="display: none;">
+          <input type="file" id="file-input" accept="video/*"
+            class="block w-full text-sm text-gray-300 dark:text-gray-800 file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-semibold file:bg-blue-700 file:text-white hover:file:bg-blue-800 dark:file:bg-blue-400 dark:file:text-gray-900 dark:hover:file:bg-blue-500">
+          <p id="file-error" class="text-red-500 dark:text-red-600"></p>
+        </div>
+        
+        <!-- Video Player -->
+        <div class="w-full flex justify-center mt-4" style="display: none;" id="video-player">
+          <video id="video-player-main" controls class="w-full max-w-4xl bg-black dark:bg-gray-200 rounded-md shadow-lg"></video>
+        </div>
+      </div>
+      
+      <!-- Chat Sidebar Section (25%) -->
+      <div class="w-full md:w-1/4 p-4 bg-gray-700 dark:bg-gray-300 text-gray-100 dark:text-gray-800 rounded-md shadow-inner flex flex-col">
+        
+        <h2 class="text-xl font-semibold mb-4 text-blue-400 dark:text-blue-600">Chat</h2>
+        
+        <!-- Chat Messages -->
+        <div id="chat-messages" class="flex-grow h-64 overflow-y-auto mb-4 bg-gray-600 dark:bg-gray-200 p-2 rounded">
+          <!-- Chat messages will appear here -->
+        </div>
+        
+        <!-- Chat Input -->
+        <div class="flex">
+          <input type="text" id="chat-input" placeholder="Type your message..."
+            class="flex-grow bg-gray-500 dark:bg-gray-100 border border-gray-600 dark:border-gray-400 text-white dark:text-gray-800 rounded-md px-4 py-2 focus:outline-none focus:border-blue-400 focus:ring-1 focus:ring-blue-400">
+          <button id="send-chat" class="ml-2 bg-green-500 hover:bg-green-600 text-white dark:bg-green-400 dark:hover:bg-green-500 dark:text-gray-900 px-4 py-2 rounded-md focus:outline-none focus:ring-2 focus:ring-green-300">
+            Send
+          </button>
+        </div>
+      </div>
+    </div>
+    
+    <!-- Error Message -->
+    <p id="room-error" class="text-center text-red-500 dark:text-red-600 mt-4"></p>
   </div>
 
   <script src="renderer.js"></script>
