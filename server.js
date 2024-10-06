@@ -5,9 +5,11 @@ const server = new WebSocket.Server({ port: 8080, host: '0.0.0.0' }); // Listen 
 const rooms = {};
 
 server.on('connection', (socket) => {
+  console.log('New client connected');
   socket.roomId = null;
 
   socket.on('message', (message) => {
+    console.log('Received message:', message);
     let data;
     try {
       data = JSON.parse(message);
@@ -27,25 +29,37 @@ server.on('connection', (socket) => {
         break;
 
       case 'file_info':
-        broadcastToRoom(socket.roomId, {
-          type: 'file_info',
-          duration: data.duration
-        }, socket);
+        if (validateRoom(socket.roomId)) {
+          broadcastToRoom(socket.roomId, {
+            type: 'file_info',
+            duration: data.duration
+          }, socket);
+        } else {
+          socket.send(JSON.stringify({ type: 'error', message: 'You are not in a valid room.' }));
+        }
         break;
 
       case 'sync_action':
-        broadcastToRoom(socket.roomId, {
-          type: 'sync_action',
-          action: data.action,
-          currentTime: data.currentTime
-        }, socket);
+        if (validateRoom(socket.roomId)) {
+          broadcastToRoom(socket.roomId, {
+            type: 'sync_action',
+            action: data.action,
+            currentTime: data.currentTime
+          }, socket);
+        } else {
+          socket.send(JSON.stringify({ type: 'error', message: 'You are not in a valid room.' }));
+        }
         break;
 
       case 'chat_message':
-        broadcastToRoom(socket.roomId, {
-          type: 'chat_message',
-          message: data.message
-        }, socket);
+        if (validateRoom(socket.roomId)) {
+          broadcastToRoom(socket.roomId, {
+            type: 'chat_message',
+            message: data.message
+          }, socket);
+        } else {
+          socket.send(JSON.stringify({ type: 'error', message: 'You are not in a valid room.' }));
+        }
         break;
 
       default:
@@ -56,13 +70,20 @@ server.on('connection', (socket) => {
   });
 
   socket.on('close', () => {
+    console.log('Client disconnected');
     if (socket.roomId && rooms[socket.roomId]) {
       rooms[socket.roomId] = rooms[socket.roomId].filter(client => client !== socket);
       broadcastToRoom(socket.roomId, { type: 'peer_left' }, socket);
+      console.log(`Client removed from room: ${socket.roomId}`);
       if (rooms[socket.roomId].length === 0) {
         delete rooms[socket.roomId];
+        console.log(`Room deleted: ${socket.roomId}`);
       }
     }
+  });
+
+  socket.on('error', (error) => {
+    console.error('WebSocket error:', error);
   });
 });
 
@@ -72,18 +93,22 @@ function createRoom(socket) {
   socket.roomId = roomId;
   socket.send(JSON.stringify({ type: 'room_created', roomId }));
   console.log(`Room created: ${roomId}`);
+  console.log(`Current Rooms:`, rooms);
 }
 
 function joinRoom(socket, roomId) {
+  console.log(`Attempting to join room: ${roomId}`);
+  console.log(`Current Rooms:`, rooms);
   if (rooms[roomId] && rooms[roomId].length < 2) {
     rooms[roomId].push(socket);
     socket.roomId = roomId;
     socket.send(JSON.stringify({ type: 'room_joined', roomId }));
     broadcastToRoom(roomId, { type: 'both_joined' }, socket);
     console.log(`Socket joined room: ${roomId}`);
+    console.log(`Updated Rooms:`, rooms);
   } else {
     socket.send(JSON.stringify({ type: 'error', message: 'Room not found or full.' }));
-    console.log(`Failed to join room: ${roomId}`);
+    console.log(`Failed to join room: ${roomId} - Room not found or full.`);
   }
 }
 
@@ -95,6 +120,10 @@ function broadcastToRoom(roomId, message, senderSocket) {
       }
     });
   }
+}
+
+function validateRoom(roomId) {
+  return roomId && rooms[roomId] && rooms[roomId].length > 0;
 }
 
 console.log('WebSocket server is running on ws://localhost:8080');
