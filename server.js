@@ -8,14 +8,7 @@ server.on('connection', (socket) => {
   socket.roomId = null;
 
   socket.on('message', (message) => {
-    let data;
-    try {
-      data = JSON.parse(message);
-    } catch (error) {
-      console.error('Invalid JSON:', error);
-      socket.send(JSON.stringify({ type: 'error', message: 'Invalid JSON format.' }));
-      return;
-    }
+    const data = JSON.parse(message);
 
     switch (data.type) {
       case 'create_room':
@@ -64,12 +57,12 @@ server.on('connection', (socket) => {
           });
         }
         break;
-
+      
       case 'chat_message':
         const chatRoom = rooms[socket.roomId];
         if (chatRoom) {
           chatRoom.forEach(client => {
-            if (client.readyState === WebSocket.OPEN) {
+            if (client !== socket && client.readyState === WebSocket.OPEN) {
               client.send(JSON.stringify({
                 type: 'chat_message',
                 message: data.message
@@ -79,40 +72,7 @@ server.on('connection', (socket) => {
         }
         break;
 
-      case 'voice_call':
-      case 'video_call':
-        const callRoom = rooms[socket.roomId];
-        if (callRoom) {
-          callRoom.forEach(client => {
-            if (client !== socket && client.readyState === WebSocket.OPEN) {
-              client.send(JSON.stringify({
-                type: data.type,
-                roomId: data.roomId
-              }));
-            }
-          });
-        }
-        break;
-
-      case 'call_offer':
-      case 'call_answer':
-      case 'ice_candidate':
-        const signalingRoom = rooms[socket.roomId];
-        if (signalingRoom) {
-          signalingRoom.forEach(client => {
-            if (client !== socket && client.readyState === WebSocket.OPEN) {
-              client.send(JSON.stringify({
-                type: data.type,
-                roomId: data.roomId,
-                ...data
-              }));
-            }
-          });
-        }
-        break;
-
       default:
-        socket.send(JSON.stringify({ type: 'error', message: 'Unknown message type.' }));
         break;
     }
   });

@@ -1,23 +1,9 @@
 // renderer.js
 const { ipcRenderer } = require('electron');
 
-// Video Elements
+// UI Elements
 const videoPlayerContainer = document.getElementById('video-player'); // Container div
 const videoPlayer = document.getElementById('video-player-main'); // Video element
-
-// Chat Elements
-const chatMessages = document.getElementById('chat-messages');
-const chatInput = document.getElementById('chat-input');
-const sendChatBtn = document.getElementById('send-chat');
-
-// Voice and Video Call Buttons
-const voiceCallBtn = document.getElementById('voice-call-btn');
-const videoCallBtn = document.getElementById('video-call-btn');
-
-// Video Call Elements
-const videoCallContainer = document.getElementById('video-call-container');
-const localVideo = document.getElementById('local-video');
-const remoteVideo = document.getElementById('remote-video');
 
 const fileInput = document.getElementById('file-input');
 const createRoomBtn = document.getElementById('create-room');
@@ -28,11 +14,33 @@ const errorMsg = document.getElementById('error');
 const fileError = document.getElementById('file-error');
 const fileSelection = document.getElementById('file-selection');
 
+// Chat Elements
+const chatMessages = document.getElementById('chat-messages');
+const chatInput = document.getElementById('chat-input');
+const sendChatBtn = document.getElementById('send-chat');
+
+// Call Elements (Assuming you have these in your HTML)
+const voiceCallBtn = document.getElementById('voice-call');
+const videoCallBtn = document.getElementById('video-call');
+const localVideo = document.getElementById('local-video');
+const remoteVideo = document.getElementById('remote-video');
+
 let ws;
 let isPeerReady = false;
 let isFileVerified = false;
 let localDuration = null;
 let remoteDuration = null;
+
+// WebRTC Variables
+let peerConnection;
+const configuration = {
+  iceServers: [
+    { urls: 'stun:stun.l.google.com:19302' }, // Public STUN server
+  ]
+};
+
+// Queue to hold ICE candidates received before remote description is set
+let iceCandidateQueue = [];
 
 // Flag to prevent sync loop
 let isSyncing = false;
@@ -41,21 +49,9 @@ let isSyncing = false;
 let seekDebounceTimer = null;
 const SEEK_DEBOUNCE_DELAY = 300; // milliseconds
 
-// WebRTC Variables
-let localStream = null;
-let peerConnection = null;
-
-// STUN Servers - Publicly available for development
-const configuration = {
-  iceServers: [
-    { urls: 'stun:stun.l.google.com:19302' },
-    // You can add TURN servers here for better connectivity
-  ]
-};
-
 // Initialize WebSocket connection
 function initWebSocket() {
-  ws = new WebSocket('ws://192.168.107.56:8080'); // Replace with your server's IP
+  ws = new WebSocket('ws://192.168.61.120:8080'); // Replace with your server's IP
 
   ws.onopen = () => {
     console.log('Connected to WebSocket server');
@@ -76,6 +72,8 @@ function initWebSocket() {
       case 'both_joined':
         isPeerReady = true;
         fileSelection.style.display = 'flex'; // Use flex for better alignment
+        // Initialize WebRTC Peer Connection
+        initializePeerConnection();
         break;
 
       case 'file_info':
@@ -91,24 +89,8 @@ function initWebSocket() {
         appendChatMessage('Peer', data.message);
         break;
 
-      case 'voice_call':
-        await handleIncomingCall('voice');
-        break;
-
-      case 'video_call':
-        await handleIncomingCall('video');
-        break;
-
-      case 'call_offer':
-        await handleCallOffer(data);
-        break;
-
-      case 'call_answer':
-        await handleCallAnswer(data);
-        break;
-
       case 'ice_candidate':
-        await handleNewICECandidate(data);
+        await handleRemoteIceCandidate(data.candidate);
         break;
 
       case 'error':
@@ -119,7 +101,6 @@ function initWebSocket() {
         errorMsg.textContent = 'Peer has left the room.';
         videoPlayerContainer.style.display = 'none';
         fileSelection.style.display = 'none';
-        endCall();
         break;
 
       default:
@@ -185,6 +166,57 @@ function verifyFiles() {
   }
 }
 
+// Initialize WebRTC Peer Connection
+function initializePeerConnection() {
+  peerConnection = new RTCPeerConnection(configuration);
+
+  // Handle ICE candidates
+  peerConnection.onicecandidate = (event) => {
+    if (event.candidate) {
+      ws.send(JSON.stringify({ type: 'ice_candidate', candidate: event.candidate }));
+    }
+  };
+
+  // Handle remote stream
+  peerConnection.ontrack = (event) => {
+    if (event.streams && event.streams[0]) {
+      remoteVideo.srcObject = event.streams[0];
+    }
+  };
+
+  // Add local stream if any (for voice/video calls)
+  // This section can be expanded based on call implementations
+}
+
+// Handle incoming ICE candidates
+async function handleRemoteIceCandidate(candidate) {
+  try {
+    if (peerConnection.remoteDescription) {
+      await peerConnection.addIceCandidate(new RTCIceCandidate(candidate));
+    } else {
+      // Queue the candidate if remote description is not set yet
+      iceCandidateQueue.push(candidate);
+    }
+  } catch (error) {
+    console.error('Error adding ICE candidate:', error);
+  }
+}
+
+// After setting remote description, process the queued ICE candidates
+async function setRemoteDescriptionAndProcessQueue(description) {
+  try {
+    await peerConnection.setRemoteDescription(new RTCSessionDescription(description));
+
+    // Process queued ICE candidates
+    while (iceCandidateQueue.length > 0) {
+      const candidate = iceCandidateQueue.shift();
+      await peerConnection.addIceCandidate(new RTCIceCandidate(candidate));
+    }
+  } catch (error) {
+    console.error('Error setting remote description:', error);
+  }
+}
+
 // Handle synchronization actions from the peer
 function handleSyncAction(data) {
   if (!isFileVerified) return;
@@ -215,6 +247,32 @@ function handleSyncAction(data) {
   }, 100); // 100ms delay
 }
 
+// Synchronize play, pause, and seek actions with checks
+videoPlayer.addEventListener('play', () => {
+  if (isFileVerified && !isSyncing) { // Check if not syncing
+    console.log('Sending play action to peer');
+    ws.send(JSON.stringify({ type: 'sync_action', action: 'play', currentTime: videoPlayer.currentTime }));
+  }
+});
+
+videoPlayer.addEventListener('pause', () => {
+  if (isFileVerified && !isSyncing) { // Check if not syncing
+    console.log('Sending pause action to peer');
+    ws.send(JSON.stringify({ type: 'sync_action', action: 'pause', currentTime: videoPlayer.currentTime }));
+  }
+});
+
+videoPlayer.addEventListener('seeked', () => {
+  if (isFileVerified && !isSyncing) { // Check if not syncing
+    // Implement debouncing to prevent rapid-fire seek events
+    clearTimeout(seekDebounceTimer);
+    seekDebounceTimer = setTimeout(() => {
+      console.log('Sending seek action to peer');
+      ws.send(JSON.stringify({ type: 'sync_action', action: 'seek', currentTime: videoPlayer.currentTime }));
+    }, SEEK_DEBOUNCE_DELAY);
+  }
+});
+
 // Chat Functionality
 
 // Send chat message
@@ -228,225 +286,17 @@ sendChatBtn.addEventListener('click', () => {
   }
 });
 
-// Append chat message to the chat box
+// Append chat message to the chat box with differentiation
 function appendChatMessage(sender, message) {
   const messageElement = document.createElement('div');
-  messageElement.classList.add('mb-2');
+  if (sender === 'You') {
+    // Sent messages
+    messageElement.classList.add('self-end', 'bg-blue-500', 'text-white', 'p-2', 'rounded-md', 'mb-2', 'max-w-xs');
+  } else {
+    // Received messages
+    messageElement.classList.add('self-start', 'bg-gray-300', 'text-gray-800', 'p-2', 'rounded-md', 'mb-2', 'max-w-xs');
+  }
   messageElement.innerHTML = `<strong>${sender}:</strong> ${message}`;
   chatMessages.appendChild(messageElement);
   chatMessages.scrollTop = chatMessages.scrollHeight;
 }
-
-// Voice and Video Call Functionality
-
-// Handle Voice Call Button Click
-voiceCallBtn.addEventListener('click', async () => {
-  if (isPeerReady) {
-    initiateCall('voice');
-  }
-});
-
-// Handle Video Call Button Click
-videoCallBtn.addEventListener('click', async () => {
-  if (isPeerReady) {
-    initiateCall('video');
-  }
-});
-
-// Initiate Call (Voice or Video)
-async function initiateCall(callType) {
-  try {
-    // Get user media
-    const constraints = callType === 'video' ? { audio: true, video: true } : { audio: true, video: false };
-    localStream = await navigator.mediaDevices.getUserMedia(constraints);
-    localVideo.srcObject = localStream;
-
-    // Display video call container if it's a video call
-    if (callType === 'video') {
-      videoCallContainer.classList.remove('hidden');
-    }
-
-    // Create RTCPeerConnection
-    peerConnection = new RTCPeerConnection(configuration);
-
-    // Add local stream tracks to peer connection
-    localStream.getTracks().forEach(track => {
-      peerConnection.addTrack(track, localStream);
-    });
-
-    // Handle incoming remote stream
-    peerConnection.ontrack = (event) => {
-      const [remoteStream] = event.streams;
-      remoteVideo.srcObject = remoteStream;
-    };
-
-    // Handle ICE candidates
-    peerConnection.onicecandidate = (event) => {
-      if (event.candidate) {
-        ws.send(JSON.stringify({
-          type: 'ice_candidate',
-          candidate: event.candidate,
-          roomId: roomIdInput.value.trim()
-        }));
-      }
-    };
-
-    // Create offer
-    const offer = await peerConnection.createOffer();
-    await peerConnection.setLocalDescription(offer);
-
-    // Send offer to peer
-    ws.send(JSON.stringify({
-      type: callType === 'video' ? 'video_call' : 'voice_call',
-      offer: offer,
-      roomId: roomIdInput.value.trim()
-    }));
-
-    console.log(`${callType} call initiated.`);
-  } catch (error) {
-    console.error('Error initiating call:', error);
-    errorMsg.textContent = `Error initiating call: ${error.message}`;
-  }
-}
-
-// Handle Incoming Call (Voice or Video)
-async function handleIncomingCall(callType) {
-  try {
-    // Get user media
-    const constraints = callType === 'video' ? { audio: true, video: true } : { audio: true, video: false };
-    localStream = await navigator.mediaDevices.getUserMedia(constraints);
-    localVideo.srcObject = localStream;
-
-    // Display video call container if it's a video call
-    if (callType === 'video') {
-      videoCallContainer.classList.remove('hidden');
-    }
-
-    // Create RTCPeerConnection
-    peerConnection = new RTCPeerConnection(configuration);
-
-    // Add local stream tracks to peer connection
-    localStream.getTracks().forEach(track => {
-      peerConnection.addTrack(track, localStream);
-    });
-
-    // Handle incoming remote stream
-    peerConnection.ontrack = (event) => {
-      const [remoteStream] = event.streams;
-      remoteVideo.srcObject = remoteStream;
-    };
-
-    // Handle ICE candidates
-    peerConnection.onicecandidate = (event) => {
-      if (event.candidate) {
-        ws.send(JSON.stringify({
-          type: 'ice_candidate',
-          candidate: event.candidate,
-          roomId: roomIdInput.value.trim()
-        }));
-      }
-    };
-
-    console.log(`Incoming ${callType} call received.`);
-
-  } catch (error) {
-    console.error('Error handling incoming call:', error);
-    errorMsg.textContent = `Error handling incoming call: ${error.message}`;
-  }
-}
-
-// Handle Call Offer
-async function handleCallOffer(data) {
-  try {
-    const offer = data.offer;
-    await peerConnection.setRemoteDescription(new RTCSessionDescription(offer));
-
-    // Create answer
-    const answer = await peerConnection.createAnswer();
-    await peerConnection.setLocalDescription(answer);
-
-    // Send answer back to caller
-    ws.send(JSON.stringify({
-      type: 'call_answer',
-      answer: answer,
-      roomId: roomIdInput.value.trim()
-    }));
-
-    console.log('Call offer handled and answer sent.');
-  } catch (error) {
-    console.error('Error handling call offer:', error);
-    errorMsg.textContent = `Error handling call offer: ${error.message}`;
-  }
-}
-
-// Handle Call Answer
-async function handleCallAnswer(data) {
-  try {
-    const answer = data.answer;
-    await peerConnection.setRemoteDescription(new RTCSessionDescription(answer));
-
-    console.log('Call answer received and set.');
-  } catch (error) {
-    console.error('Error handling call answer:', error);
-    errorMsg.textContent = `Error handling call answer: ${error.message}`;
-  }
-}
-
-// Handle New ICE Candidate
-async function handleNewICECandidate(data) {
-  try {
-    const candidate = data.candidate;
-    await peerConnection.addIceCandidate(new RTCIceCandidate(candidate));
-    console.log('New ICE candidate added.');
-  } catch (error) {
-    console.error('Error adding received ICE candidate:', error);
-    errorMsg.textContent = `Error adding ICE candidate: ${error.message}`;
-  }
-}
-
-// End Call and Clean Up
-function endCall() {
-  if (peerConnection) {
-    peerConnection.close();
-    peerConnection = null;
-  }
-  if (localStream) {
-    localStream.getTracks().forEach(track => track.stop());
-    localStream = null;
-  }
-  localVideo.srcObject = null;
-  remoteVideo.srcObject = null;
-  videoCallContainer.classList.add('hidden');
-}
-
-// Handle Incoming Call Type (voice or video)
-async function handleIncomingCall(data) {
-  const callType = data.type === 'video_call' ? 'video' : 'voice';
-  await handleIncomingCall(callType);
-}
-
-// Synchronize play, pause, and seek actions with checks
-videoPlayer.addEventListener('play', () => {
-  if (isFileVerified && !isSyncing) { // Check if not syncing
-    console.log('Sending play action to peer');
-    ws.send(JSON.stringify({ type: 'sync_action', action: 'play', currentTime: videoPlayer.currentTime, roomId: roomIdInput.value.trim() }));
-  }
-});
-
-videoPlayer.addEventListener('pause', () => {
-  if (isFileVerified && !isSyncing) { // Check if not syncing
-    console.log('Sending pause action to peer');
-    ws.send(JSON.stringify({ type: 'sync_action', action: 'pause', currentTime: videoPlayer.currentTime, roomId: roomIdInput.value.trim() }));
-  }
-});
-
-videoPlayer.addEventListener('seeked', () => {
-  if (isFileVerified && !isSyncing) { // Check if not syncing
-    // Implement debouncing to prevent rapid-fire seek events
-    clearTimeout(seekDebounceTimer);
-    seekDebounceTimer = setTimeout(() => {
-      console.log('Sending seek action to peer');
-      ws.send(JSON.stringify({ type: 'sync_action', action: 'seek', currentTime: videoPlayer.currentTime, roomId: roomIdInput.value.trim() }));
-    }, SEEK_DEBOUNCE_DELAY);
-  }
-});
