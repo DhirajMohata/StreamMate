@@ -1,23 +1,27 @@
 // server.js
 const WebSocket = require('ws');
-const server = new WebSocket.Server({ port: 8080, host: '0.0.0.0' });
+const server = new WebSocket.Server({ port: 8080, host: '0.0.0.0' }); // Listen on all interfaces
 
 const rooms = {};
-console.log("HEREE", server)
+
 server.on('connection', (socket) => {
   socket.roomId = null;
-  console.log("HEREE")
+
   socket.on('message', (message) => {
-    const data = JSON.parse(message);
+    let data;
+    try {
+      data = JSON.parse(message);
+    } catch (error) {
+      console.error('Invalid JSON:', error);
+      socket.send(JSON.stringify({ type: 'error', message: 'Invalid JSON format.' }));
+      return;
+    }
 
     switch (data.type) {
       case 'create_room':
-        // Generate a unique room ID
-        console.log("HEREE")
         const roomId = `room_${Math.random().toString(36).substr(2, 9)}`;
         rooms[roomId] = [socket];
         socket.roomId = roomId;
-        console.log("HEREE")
         socket.send(JSON.stringify({ type: 'room_created', roomId }));
         break;
 
@@ -27,7 +31,6 @@ server.on('connection', (socket) => {
           rooms[joinRoomId].push(socket);
           socket.roomId = joinRoomId;
           socket.send(JSON.stringify({ type: 'room_joined', roomId: joinRoomId }));
-          // Notify both clients that both have joined
           rooms[joinRoomId].forEach(client => {
             client.send(JSON.stringify({ type: 'both_joined' }));
           });
@@ -37,7 +40,6 @@ server.on('connection', (socket) => {
         break;
 
       case 'file_info':
-        // Broadcast file info to the other client in the room
         const currentRoom = rooms[socket.roomId];
         if (currentRoom) {
           currentRoom.forEach(client => {
@@ -49,7 +51,6 @@ server.on('connection', (socket) => {
         break;
 
       case 'sync_action':
-        // Broadcast playback actions (play, pause, seek) to the other client
         const syncRoom = rooms[socket.roomId];
         if (syncRoom) {
           syncRoom.forEach(client => {
@@ -64,7 +65,54 @@ server.on('connection', (socket) => {
         }
         break;
 
+      case 'chat_message':
+        const chatRoom = rooms[socket.roomId];
+        if (chatRoom) {
+          chatRoom.forEach(client => {
+            if (client.readyState === WebSocket.OPEN) {
+              client.send(JSON.stringify({
+                type: 'chat_message',
+                message: data.message
+              }));
+            }
+          });
+        }
+        break;
+
+      case 'voice_call':
+      case 'video_call':
+        const callRoom = rooms[socket.roomId];
+        if (callRoom) {
+          callRoom.forEach(client => {
+            if (client !== socket && client.readyState === WebSocket.OPEN) {
+              client.send(JSON.stringify({
+                type: data.type,
+                roomId: data.roomId
+              }));
+            }
+          });
+        }
+        break;
+
+      case 'call_offer':
+      case 'call_answer':
+      case 'ice_candidate':
+        const signalingRoom = rooms[socket.roomId];
+        if (signalingRoom) {
+          signalingRoom.forEach(client => {
+            if (client !== socket && client.readyState === WebSocket.OPEN) {
+              client.send(JSON.stringify({
+                type: data.type,
+                roomId: data.roomId,
+                ...data
+              }));
+            }
+          });
+        }
+        break;
+
       default:
+        socket.send(JSON.stringify({ type: 'error', message: 'Unknown message type.' }));
         break;
     }
   });
@@ -72,7 +120,6 @@ server.on('connection', (socket) => {
   socket.on('close', () => {
     if (socket.roomId && rooms[socket.roomId]) {
       rooms[socket.roomId] = rooms[socket.roomId].filter(client => client !== socket);
-      // Notify the remaining client that the other has left
       rooms[socket.roomId].forEach(client => {
         client.send(JSON.stringify({ type: 'peer_left' }));
       });
