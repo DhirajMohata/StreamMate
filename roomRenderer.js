@@ -21,6 +21,9 @@ const roomId = urlParams.get('roomId');
 if (!roomId) {
   errorMsg.textContent = 'No Room ID provided.';
   // Optionally, redirect back to the landing page
+  setTimeout(() => {
+    window.location.href = 'index.html';
+  }, 2000);
 }
 
 // Display Room Name
@@ -28,7 +31,7 @@ roomNameDisplay.textContent = `Room: ${roomId}`;
 
 // Handle WebSocket Initialization
 window.addEventListener('DOMContentLoaded', () => {
-  window.electronAPI.initializeWebSocket('ws://localhost:8080'); // Replace with your server's IP if needed
+  window.electronAPI.initializeWebSocket('ws://192.168.61.120:8080'); // Replace with your server's IP if needed
 });
 
 // Handle incoming WebSocket messages

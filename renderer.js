@@ -9,7 +9,7 @@ const errorMsg = document.getElementById('error');
 
 // Handle WebSocket Initialization
 window.addEventListener('DOMContentLoaded', () => {
-  window.electronAPI.initializeWebSocket('ws://localhost:8080'); // Replace with your server's IP if needed
+  window.electronAPI.initializeWebSocket('ws://192.168.61.120:8080'); // Replace with your server's IP if needed
 });
 
 // Handle incoming WebSocket messages
